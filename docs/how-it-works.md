@@ -132,3 +132,22 @@ consider step-up or session rotation
 Keybound helps when cookies are copied but the browser private key is not copied. It does not protect against a compromised server, stolen server secret, XSS that can run inside the active browser, malware controlling the browser, or phishing that obtains a fresh proof for the same purpose.
 
 Use it with secure session cookies, CSRF protection, XSS defenses, MFA, session rotation, rate limits, and clear device revocation.
+
+## Why Not CPU Timing Checks
+
+Keybound does not try to prove that a request came from the same CPU by measuring browser calculation time, WebAssembly speed, rendering timing, or similar signals.
+
+Those checks are fragile:
+
+```text
+battery mode changes timing
+thermal throttling changes timing
+browser updates change timing
+JIT warmup changes timing
+mobile devices vary heavily
+virtual machines and remote desktops distort results
+attackers can replay or shape timing
+privacy tools may reduce timer precision
+```
+
+They also create fingerprinting concerns. Keybound uses cryptographic possession instead: the browser either has the enrolled private key and can sign the challenge, or it cannot.

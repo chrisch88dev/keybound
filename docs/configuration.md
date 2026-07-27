@@ -14,6 +14,22 @@ export const keybound = createKeybound({
 
 Do not create it in browser code. Do not ship `KEYBOUND_SECRET` to the client.
 
+`KEYBOUND_SECRET` signs challenge records with HMAC. Generate it once:
+
+```sh
+openssl rand -base64 32
+```
+
+Use `.env` or `.env.local` for development. Use a real secret manager in production. Every server instance that issues or verifies challenges needs the same value.
+
+Do not use `randomBytes(32)` as a fallback in production startup code. A fresh value on every restart invalidates active challenge records and makes multi-server deployments inconsistent.
+
+## Local Development
+
+Keybound does not provide an insecure cookie mode. `Secure`, `HttpOnly`, and `Path=/` stay enabled.
+
+For local work, use `http://localhost` or local HTTPS. If a browser, proxy, or framework refuses secure cookies on local HTTP, run the dev server with HTTPS. Do not weaken production code to make local setup easier.
+
 ## Presets
 
 | Preset | Challenge lifetime | Device cookie |
