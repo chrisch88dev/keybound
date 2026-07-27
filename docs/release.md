@@ -1,6 +1,6 @@
 # Release Checklist
 
-This repo does not use GitHub Actions. Release manually unless that policy changes.
+This repo has a manual GitHub Actions release workflow and can also be released from a local machine.
 
 ## Before Publish
 
@@ -56,6 +56,18 @@ If the name is available or owned by you, publish:
 npm publish --access public
 ```
 
+## GitHub Actions
+
+Add an `NPM_TOKEN` repository secret before using the workflow.
+
+Then run the `Release` workflow manually from GitHub and set:
+
+```text
+confirm = publish
+```
+
+The workflow runs install, checks, benchmarks, a pack dry-run, then publishes.
+
 ## Git Tag
 
 After npm publish succeeds:
@@ -90,4 +102,4 @@ Initial public release.
 
 ## Provenance
 
-npm provenance normally uses a trusted publisher flow through CI. Since this repo currently avoids GitHub Actions, manual publish is the simpler path. Add a workflow only if the project policy changes.
+npm provenance normally uses a trusted publisher flow through CI. The current workflow uses an npm token secret. Move to trusted publishing later if you want provenance without long-lived npm tokens.
