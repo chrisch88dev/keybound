@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+.cache/
+.DS_Store
+*.log
+
+.env
+.env.*
+!.env.example
+
+# Local assistant and project notes
+/AGENTS.md
+/CLAUDE.md
+private/

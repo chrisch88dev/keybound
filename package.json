@@ -1,0 +1,62 @@
+{
+  "name": "keybound",
+  "version": "0.0.0",
+  "description": "Framework-neutral session binding for Node.js. Make stolen session cookies harder to reuse.",
+  "type": "module",
+  "license": "MIT",
+  "author": "chrisch88dev",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/chrisch88dev/keybound.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chrisch88dev/keybound/issues"
+  },
+  "homepage": "https://github.com/chrisch88dev/keybound#readme",
+  "keywords": [
+    "session-security",
+    "cookie-security",
+    "cookie-replay",
+    "middleware",
+    "nodejs",
+    "typescript",
+    "security",
+    "express",
+    "fastify",
+    "nextjs"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./presets": {
+      "types": "./dist/presets.d.ts",
+      "default": "./dist/presets.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "clean": "rm -rf dist coverage",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test tests/**/*.test.mjs",
+    "check": "npm run typecheck && npm test",
+    "prepack": "npm run check"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
+  }
+}
