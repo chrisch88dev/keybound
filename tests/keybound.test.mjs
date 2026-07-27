@@ -12,7 +12,10 @@ import {
   defineConfig,
   DEFAULT_PRESET,
   RELAXED_PRESET,
-  STRICT_PRESET
+  STRICT_PRESET,
+  clearKeyboundCookie,
+  readKeyboundCookie,
+  serializeKeyboundCookie
 } from "../dist/index.js";
 
 const NOW = 1_700_000_000_000;
@@ -156,6 +159,65 @@ describe("configuration", () => {
     assert.throws(
       () => defineConfig({ cookie: { name: "invalid;cookie" } }),
       TypeError
+    );
+  });
+});
+
+describe("http helpers", () => {
+  it("serializes and reads the configured device cookie", () => {
+    const keybound = createKeybound({ secret: randomBytes(32) });
+    const deviceId = keybound.createDeviceId();
+    const setCookie = serializeKeyboundCookie(keybound.config, deviceId);
+
+    assert.match(setCookie, /^__Host-keybound=/);
+    assert.match(setCookie, /Max-Age=15552000/);
+    assert.match(setCookie, /Path=\//);
+    assert.match(setCookie, /HttpOnly/);
+    assert.match(setCookie, /Secure/);
+    assert.match(setCookie, /SameSite=Lax/);
+    assert.equal(
+      readKeyboundCookie(`other=value; __Host-keybound=${deviceId}`, keybound.config),
+      deviceId
+    );
+  });
+
+  it("keeps strict and partitioned cookie attributes explicit", () => {
+    const keybound = createKeybound({
+      secret: randomBytes(32),
+      preset: "strict",
+      cookie: {
+        partitioned: true
+      }
+    });
+
+    const setCookie = serializeKeyboundCookie(
+      keybound.config,
+      keybound.createDeviceId()
+    );
+
+    assert.match(setCookie, /SameSite=Strict/);
+    assert.match(setCookie, /Partitioned/);
+  });
+
+  it("rejects invalid device cookie values", () => {
+    const keybound = createKeybound({ secret: randomBytes(32) });
+
+    assert.throws(
+      () => serializeKeyboundCookie(keybound.config, "not-a-device"),
+      TypeError
+    );
+    assert.equal(
+      readKeyboundCookie("__Host-keybound=not-a-device", keybound.config),
+      null
+    );
+  });
+
+  it("clears the configured device cookie", () => {
+    const config = defineConfig({ preset: "strict" });
+
+    assert.equal(
+      clearKeyboundCookie(config),
+      "__Host-keybound=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict"
     );
   });
 });

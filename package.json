@@ -41,6 +41,10 @@
     "./presets": {
       "types": "./dist/presets.d.ts",
       "default": "./dist/presets.js"
+    },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "default": "./dist/http.js"
     }
   },
   "types": "./dist/index.d.ts",

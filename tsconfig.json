@@ -17,6 +17,6 @@
     "outDir": "dist",
     "types": ["node"]
   },
-  "include": ["src", "tests", "bench"],
+  "include": ["src", "tests"],
   "exclude": ["dist", "node_modules", "private"]
 }

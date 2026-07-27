@@ -1,5 +1,10 @@
 export { createDeviceId, createKeybound, defineConfig } from "./keybound.js";
 export {
+  clearKeyboundCookie,
+  readKeyboundCookie,
+  serializeKeyboundCookie
+} from "./http.js";
+export {
   DEFAULT_PRESET,
   RELAXED_PRESET,
   STRICT_PRESET,
