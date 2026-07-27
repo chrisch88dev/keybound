@@ -8,6 +8,10 @@ import { webcrypto } from "node:crypto";
 import { describe, it } from "node:test";
 
 import {
+  describeKeyboundBrowserError,
+  isKeyboundBrowserSupported
+} from "../dist/browser.js";
+import {
   createKeybound,
   defineConfig,
   DEFAULT_PRESET,
@@ -201,6 +205,7 @@ describe("http helpers", () => {
 
   it("rejects invalid device cookie values", () => {
     const keybound = createKeybound({ secret: randomBytes(32) });
+    const deviceId = keybound.createDeviceId();
 
     assert.throws(
       () => serializeKeyboundCookie(keybound.config, "not-a-device"),
@@ -208,6 +213,20 @@ describe("http helpers", () => {
     );
     assert.equal(
       readKeyboundCookie("__Host-keybound=not-a-device", keybound.config),
+      null
+    );
+    assert.equal(
+      readKeyboundCookie(
+        [`__Host-keybound=${deviceId}`, "other=value"],
+        keybound.config
+      ),
+      deviceId
+    );
+    assert.equal(
+      readKeyboundCookie(
+        `__Host-keybound=not-a-device; __Host-keybound=${deviceId}`,
+        keybound.config
+      ),
       null
     );
   });
@@ -218,6 +237,40 @@ describe("http helpers", () => {
     assert.equal(
       clearKeyboundCookie(config),
       "__Host-keybound=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict"
+    );
+  });
+});
+
+describe("browser helpers", () => {
+  it("reports browser support from an injected runtime", () => {
+    assert.equal(isKeyboundBrowserSupported({}), false);
+    assert.equal(
+      isKeyboundBrowserSupported({
+        crypto: { subtle: {} },
+        indexedDB: {}
+      }),
+      true
+    );
+  });
+
+  it("maps browser crypto exceptions to stable reasons", () => {
+    assert.deepEqual(describeKeyboundBrowserError({ name: "NotAllowedError" }), {
+      ok: false,
+      reason: "not-allowed",
+      name: "NotAllowedError",
+      message: "The browser refused this key operation."
+    });
+    assert.equal(
+      describeKeyboundBrowserError({ name: "InvalidAccessError" }).reason,
+      "invalid-access"
+    );
+    assert.equal(
+      describeKeyboundBrowserError({ name: "DataError" }).reason,
+      "data-error"
+    );
+    assert.equal(
+      describeKeyboundBrowserError({ name: "OperationError" }).reason,
+      "operation-error"
     );
   });
 });
@@ -364,6 +417,35 @@ describe("device proof", () => {
     );
   });
 
+  it("rejects malformed public keys at issue and verify boundaries", () => {
+    const fixture = createFixture();
+    const invalidCurve = { ...fixture.device.publicKey, crv: "P-384" };
+    const invalidCoordinate = { ...fixture.device.publicKey, x: "bad" };
+
+    assert.throws(
+      () =>
+        fixture.keybound.issueChallenge({
+          sessionId: fixture.sessionId,
+          deviceId: fixture.deviceId,
+          publicKey: invalidCurve,
+          now: NOW
+        }),
+      TypeError
+    );
+    assert.equal(
+      fixture.keybound.verifyProof(
+        proofInput(fixture, { publicKey: invalidCurve })
+      ).reason,
+      "invalid-proof"
+    );
+    assert.equal(
+      fixture.keybound.verifyProof(
+        proofInput(fixture, { publicKey: invalidCoordinate })
+      ).reason,
+      "invalid-proof"
+    );
+  });
+
   it("consumes a valid challenge once and preserves it after a bad proof", async () => {
     const fixture = createFixture();
     const store = new MemoryChallengeStore();
@@ -386,6 +468,41 @@ describe("device proof", () => {
       store
     });
     assert.equal(replay.reason, "challenge-replayed");
+  });
+
+  it("allows only one winner when two valid proofs race", async () => {
+    const fixture = createFixture();
+    let consumed = false;
+    const store = {
+      async get(challengeId) {
+        return challengeId === fixture.issued.id ? fixture.issued.record : null;
+      },
+      async consume(challengeId, expectedDigest) {
+        await Promise.resolve();
+        if (
+          consumed ||
+          challengeId !== fixture.issued.id ||
+          expectedDigest !== fixture.issued.record.digest
+        ) {
+          return false;
+        }
+
+        consumed = true;
+        return true;
+      }
+    };
+
+    const results = await Promise.all([
+      fixture.keybound.verifyAndConsumeProof({ ...proofInput(fixture), store }),
+      fixture.keybound.verifyAndConsumeProof({ ...proofInput(fixture), store })
+    ]);
+
+    assert.equal(results.filter((result) => result.ok).length, 1);
+    assert.equal(
+      results.filter((result) => !result.ok && result.reason === "challenge-replayed")
+        .length,
+      1
+    );
   });
 
   it("does not query storage with malformed challenge identifiers", async () => {

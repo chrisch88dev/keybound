@@ -40,6 +40,8 @@ For local work, use `http://localhost` or local HTTPS. If a browser, proxy, or f
 
 `default` is the normal starting point. `strict` is better for admin panels, account recovery, API keys, payouts, crypto, finance, and internal tools.
 
+`relaxed` exists for low-risk apps that want a longer device memory window. Do not use it for sensitive actions without a separate policy reason.
+
 ## Cookie Lifetime
 
 The device cookie lifetime is not the login session lifetime.

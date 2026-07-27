@@ -1,8 +1,88 @@
 # Browser Key
 
-The browser private key is what makes copied cookies less useful. Keep it outside cookies.
+Use `keybound/browser` in browser code. The server package verifies proofs, but the browser helper handles the private key.
 
-## Generate
+```js
+import {
+  describeKeyboundBrowserError,
+  getOrCreateKeyboundBrowserKey
+} from "keybound/browser";
+
+const deviceKey = await getOrCreateKeyboundBrowserKey();
+
+await fetch("/keybound/enroll", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ publicKey: deviceKey.publicKey })
+});
+```
+
+Later, after the server returns a challenge:
+
+```js
+const signature = await deviceKey.signChallenge(challenge);
+```
+
+Send `challengeId`, `challenge`, and `signature` to your server.
+
+## What The Helper Does
+
+`getOrCreateKeyboundBrowserKey`:
+
+```text
+checks for Web Crypto and IndexedDB
+opens an IndexedDB database
+loads the existing device key if present
+otherwise creates a new P-256 ECDSA key pair
+stores the key pair as CryptoKey objects
+returns the public JWK and a signChallenge function
+```
+
+The private key is created as nonextractable. Browser JavaScript can ask the key to sign a challenge, but cannot export the private key bytes through Web Crypto.
+
+Do not store the private key in cookies, localStorage, JSON, logs, or analytics.
+
+## Options
+
+```js
+const deviceKey = await getOrCreateKeyboundBrowserKey({
+  dbName: "my-app-keybound",
+  storeName: "device-keys",
+  keyName: "default"
+});
+```
+
+Most apps can use the defaults.
+
+Use a different `keyName` if your app supports multiple independent device keys in the same browser profile.
+
+## Exceptions
+
+Handle browser crypto and storage failures as proof failure, not as crashes.
+
+```js
+try {
+  const deviceKey = await getOrCreateKeyboundBrowserKey();
+  const signature = await deviceKey.signChallenge(challenge);
+} catch (error) {
+  const reason = describeKeyboundBrowserError(error);
+  // Retry once, require step-up, or ask the user to re-enroll the device.
+}
+```
+
+| Reason | Common cause | Useful response |
+| --- | --- | --- |
+| `not-supported` | Web Crypto or IndexedDB is unavailable | Fall back to normal login or step-up |
+| `not-allowed` | Browser refused the key operation | Retry once, then step-up |
+| `invalid-access` | Wrong key type, curve, or usage | Re-enroll after step-up |
+| `data-error` | Malformed key or challenge data | Clear local key after step-up |
+| `operation-error` | Browser crypto or IndexedDB operation failed | Retry once, then step-up |
+
+Do not silently enroll a new device after a proof error. Device replacement is a security boundary. Require step-up authentication first.
+
+## Raw Web Crypto
+
+The helper uses the same browser primitives you would write by hand:
 
 ```js
 const keyPair = await crypto.subtle.generateKey(
@@ -10,64 +90,11 @@ const keyPair = await crypto.subtle.generateKey(
   false,
   ["sign", "verify"]
 );
-
-const publicKey = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
 ```
 
-The `false` argument makes the key nonextractable. Browser JavaScript can ask the private key to sign, but cannot export the private key bytes through Web Crypto.
+The `false` argument makes the private key nonextractable.
 
-Store the `CryptoKey` in IndexedDB:
-
-```js
-const tx = db.transaction("keys", "readwrite");
-tx.objectStore("keys").put(keyPair, "device");
-```
-
-Do not store the private key in cookies, localStorage, JSON, logs, or analytics.
-
-## Sign
-
-Keybound challenges are base64url strings. Decode the challenge before signing:
-
-```js
-const signature = await crypto.subtle.sign(
-  { name: "ECDSA", hash: "SHA-256" },
-  privateKey,
-  decodedChallenge
-);
-```
-
-Web Crypto returns a raw 64-byte P-256 signature. Keybound verifies that format directly.
-
-## Exceptions
-
-Handle browser crypto errors as proof failure, not as app crashes.
-
-| Exception | Common meaning | Useful response |
-| --- | --- | --- |
-| `NotAllowedError` | Browser refused the key operation | Retry once or require step-up |
-| `InvalidAccessError` | Wrong key type, curve, or key usage | Re-enroll after step-up |
-| `DataError` | Malformed key or challenge data | Clear local device state after step-up |
-| `OperationError` | Browser crypto operation failed | Retry once, then step-up |
-
-Example:
-
-```js
-try {
-  const signature = await crypto.subtle.sign(
-    { name: "ECDSA", hash: "SHA-256" },
-    privateKey,
-    decodedChallenge
-  );
-} catch (error) {
-  return {
-    ok: false,
-    reason: error.name || "browser-proof-failed"
-  };
-}
-```
-
-Do not silently create a new device after a proof error. Device replacement is a security boundary. Require step-up authentication first.
+Web Crypto returns a raw 64-byte P-256 signature for ECDSA. Keybound verifies that format directly, so the browser does not need DER conversion.
 
 ## Browser Support
 

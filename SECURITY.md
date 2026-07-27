@@ -5,7 +5,7 @@ Keybound verifies a one-time device proof for a session. It is designed for the 
 ## Required Deployment Rules
 
 - Use a server secret with at least 32 random bytes. Keep it in your secret manager, not source control.
-- Generate device private keys as nonextractable Web Crypto keys and keep them outside cookies.
+- Generate device private keys as nonextractable Web Crypto keys and keep them outside cookies. The `keybound/browser` helper does this for browser integrations.
 - Store the enrolled public key server-side with the device ID. Do not accept a proof request's public key as the enrolled key.
 - Require an existing device proof or step-up authentication to enroll or replace a device key. Never allow a cookie-only session to register a new key.
 - Pass that stored public key to both `issueChallenge` and `verifyAndConsumeProof`.
@@ -13,6 +13,7 @@ Keybound verifies a one-time device proof for a session. It is designed for the 
 - Implement `consume` as an atomic operation. A read followed by an unconditional write is replayable under concurrent requests.
 - Rate-limit challenge issuance and remove expired challenge records through normal storage cleanup.
 - Serve the enrollment and proof endpoints over HTTPS. Set the device ID with `keybound.config.cookie` or equivalent secure settings.
+- Keep `Secure`, `HttpOnly`, and `Path=/` enabled in development and production. Use `localhost` or local HTTPS for development instead of weakening cookie policy.
 - Treat a denied proof as an application security event. Decide whether the action is denial, step-up authentication, session rotation, or session termination.
 
 The stored challenge record contains an ID, an HMAC digest, and an expiry. It does not need to contain the raw challenge, session ID, cookie value, proof purpose, or device public key.
@@ -44,4 +45,4 @@ If private reporting is unavailable, open a minimal public issue requesting a pr
 
 ## Release Checks
 
-Before a security-sensitive release, run `npm run check`, test the target Node.js versions, verify browser Web Crypto interoperability, test the production challenge store under concurrent requests, and review changes that affect challenge formats, purpose binding, signature handling, key parsing, or cookie defaults.
+Before a security-sensitive release, run `npm run check`, `npm run bench`, test the target Node.js versions, verify browser Web Crypto interoperability, test the production challenge store under concurrent requests, and review changes that affect challenge formats, purpose binding, signature handling, key parsing, browser storage, or cookie defaults.

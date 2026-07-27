@@ -21,6 +21,7 @@ in-memory devices
 in-memory one-time challenges
 browser Web Crypto
 browser IndexedDB
+keybound/browser helper
 ```
 
 No database or framework is required.

@@ -28,6 +28,7 @@
   ],
   "sideEffects": false,
   "files": [
+    "bench",
     "dist",
     "docs",
     "examples",
@@ -47,6 +48,10 @@
     "./http": {
       "types": "./dist/http.d.ts",
       "default": "./dist/http.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "default": "./dist/browser.js"
     }
   },
   "types": "./dist/index.d.ts",
@@ -61,6 +66,7 @@
     "test": "npm run build && node --test tests/**/*.test.mjs",
     "demo": "npm run build && node examples/node-proof.mjs",
     "demo:login": "npm run build && node examples/login-site/server.mjs",
+    "bench": "npm run build && node bench/proof.mjs",
     "check": "npm run typecheck && npm test",
     "prepack": "npm run check"
   },

@@ -313,10 +313,11 @@
       </section>
     </main>
 
-    <script>
-      const DB_NAME = "keybound-demo";
-      const STORE = "keys";
-      const KEY_ID = "device";
+    <script type="module">
+      import {
+        describeKeyboundBrowserError,
+        getOrCreateKeyboundBrowserKey
+      } from "/keybound-browser.js";
 
       const $ = (id) => document.getElementById(id);
 
@@ -330,18 +331,28 @@
 
       async function login() {
         const username = $("username").value.trim();
-        const keyPair = await loadOrCreateKeyPair();
-        const publicKey = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
-        const result = await postJson("/api/login", { username, publicKey });
-        log("login", result);
-        await refresh();
+        try {
+          const deviceKey = await getOrCreateKeyboundBrowserKey({
+            dbName: "keybound-demo"
+          });
+          const result = await postJson("/api/login", {
+            username,
+            publicKey: deviceKey.publicKey
+          });
+          log("login", result);
+          await refresh();
+        } catch (error) {
+          log("browser key exception", describeKeyboundBrowserError(error));
+        }
       }
 
       async function runProtectedAction() {
         const purpose = $("purpose").value;
 
         try {
-          const keyPair = await loadOrCreateKeyPair();
+          const deviceKey = await getOrCreateKeyboundBrowserKey({
+            dbName: "keybound-demo"
+          });
           const issued = await postJson("/api/challenge", { purpose });
 
           if (!issued.ok) {
@@ -350,7 +361,7 @@
             return;
           }
 
-          const signature = await signChallenge(keyPair.privateKey, issued.challenge);
+          const signature = await deviceKey.signChallenge(issued.challenge);
           const proof = await postJson("/api/proof", {
             purpose,
             challengeId: issued.challengeId,
@@ -361,7 +372,7 @@
           log("protected action", { issued, proof });
           await refresh();
         } catch (error) {
-          log("browser proof exception", describeCryptoError(error));
+          log("browser proof exception", describeKeyboundBrowserError(error));
         }
       }
 
@@ -390,49 +401,6 @@
           : "missing";
       }
 
-      async function loadOrCreateKeyPair() {
-        const db = await openDb();
-        const saved = await dbGet(db, KEY_ID);
-        if (saved) {
-          return saved;
-        }
-
-        const keyPair = await crypto.subtle.generateKey(
-          { name: "ECDSA", namedCurve: "P-256" },
-          false,
-          ["sign", "verify"]
-        );
-        await dbPut(db, KEY_ID, keyPair);
-        return keyPair;
-      }
-
-      async function signChallenge(privateKey, challenge) {
-        const signature = await crypto.subtle.sign(
-          { name: "ECDSA", hash: "SHA-256" },
-          privateKey,
-          fromBase64url(challenge)
-        );
-
-        return toBase64url(signature);
-      }
-
-      function describeCryptoError(error) {
-        return {
-          ok: false,
-          name: error?.name ?? "Error",
-          message:
-            error?.name === "NotAllowedError"
-              ? "The browser refused this key operation."
-              : error?.name === "InvalidAccessError"
-                ? "The stored key cannot be used for this proof."
-                : error?.name === "DataError"
-                  ? "The key or challenge data is malformed."
-                  : error?.name === "OperationError"
-                    ? "The browser crypto operation failed."
-                    : error?.message ?? "Browser proof failed."
-        };
-      }
-
       async function getJson(url) {
         const response = await fetch(url, { credentials: "same-origin" });
         return response.json();
@@ -446,62 +414,6 @@
           body: JSON.stringify(body)
         });
         return response.json();
-      }
-
-      function openDb() {
-        return new Promise((resolve, reject) => {
-          const request = indexedDB.open(DB_NAME, 1);
-          request.onupgradeneeded = () => {
-            request.result.createObjectStore(STORE);
-          };
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-      }
-
-      function dbGet(db, key) {
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction(STORE, "readonly");
-          const request = tx.objectStore(STORE).get(key);
-          request.onsuccess = () => resolve(request.result ?? null);
-          request.onerror = () => reject(request.error);
-        });
-      }
-
-      function dbPut(db, key, value) {
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction(STORE, "readwrite");
-          tx.objectStore(STORE).put(value, key);
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => reject(tx.error);
-        });
-      }
-
-      function fromBase64url(value) {
-        const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
-        const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-        const binary = atob(padded);
-        const bytes = new Uint8Array(binary.length);
-
-        for (let i = 0; i < binary.length; i += 1) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-
-        return bytes;
-      }
-
-      function toBase64url(buffer) {
-        const bytes = new Uint8Array(buffer);
-        let binary = "";
-
-        for (const byte of bytes) {
-          binary += String.fromCharCode(byte);
-        }
-
-        return btoa(binary)
-          .replaceAll("+", "-")
-          .replaceAll("/", "_")
-          .replaceAll("=", "");
       }
 
       function log(label, value) {

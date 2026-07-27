@@ -133,6 +133,23 @@ Keybound helps when cookies are copied but the browser private key is not copied
 
 Use it with secure session cookies, CSRF protection, XSS defenses, MFA, session rotation, rate limits, and clear device revocation.
 
+## Benchmarks
+
+Run:
+
+```sh
+npm run bench
+```
+
+The benchmark measures the two core hot paths:
+
+```text
+issueChallenge
+verifyProof
+```
+
+It does not include database latency, network latency, framework middleware cost, or browser round trips.
+
 ## Why Not CPU Timing Checks
 
 Keybound does not try to prove that a request came from the same CPU by measuring browser calculation time, WebAssembly speed, rendering timing, or similar signals.

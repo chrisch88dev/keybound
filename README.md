@@ -4,6 +4,8 @@ Device-key session proof for Node.js.
 
 Keybound helps protect high-risk server actions when session cookies are copied from a browser profile, malware dump, leaked disk backup, or stolen cookie jar. It does not replace your login system. It adds a proof step that copied cookies alone cannot complete.
 
+Read more at [chrisch88.dev/projects/keybound](https://chrisch88.dev/projects/keybound).
+
 ```text
 session cookie          says who is logged in
 Keybound device cookie  says which enrolled device record to load
@@ -70,19 +72,11 @@ openssl rand -base64 32
 
 Put it in your local `.env` file for development. Put it in your secret manager for production. Do not generate a new random secret on every process start, or old challenges will stop verifying after a restart.
 
-## Local Development
+For local development, keep the same safe config and use `localhost` or local HTTPS. See [configuration](docs/configuration.md) for details.
 
-Keybound does not expose `secure: false` or `httpOnly: false`.
+## Demo
 
-For local work, use:
-
-```text
-http://localhost
-```
-
-or local HTTPS. Modern browsers generally treat `localhost` as a development exception for secure browser features. If your browser or framework refuses secure cookies over local HTTP, run the dev server with HTTPS instead.
-
-The included browser demo runs locally:
+Run the browser login demo:
 
 ```sh
 npm run demo:login
@@ -182,44 +176,30 @@ interface KeyboundChallengeStore {
 
 ## Browser Key
 
-The server package verifies proofs. Your browser code creates and stores the private key.
+Use `keybound/browser` in browser code:
 
 ```js
-const keyPair = await crypto.subtle.generateKey(
-  { name: "ECDSA", namedCurve: "P-256" },
-  false,
-  ["sign", "verify"]
-);
+import {
+  describeKeyboundBrowserError,
+  getOrCreateKeyboundBrowserKey
+} from "keybound/browser";
 
-const publicKey = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+try {
+  const deviceKey = await getOrCreateKeyboundBrowserKey();
+
+  await fetch("/keybound/enroll", {
+    method: "POST",
+    body: JSON.stringify({ publicKey: deviceKey.publicKey })
+  });
+
+  const issued = await fetch("/keybound/challenge").then((res) => res.json());
+  const signature = await deviceKey.signChallenge(issued.challenge);
+} catch (error) {
+  console.log(describeKeyboundBrowserError(error));
+}
 ```
 
-The `false` value means the private key is nonextractable. Browser JavaScript can ask the key to sign, but cannot export the private key bytes through Web Crypto.
-
-Store the private key as a `CryptoKey` in IndexedDB. Do not store it in cookies, localStorage, logs, JSON, or analytics.
-
-When signing:
-
-```js
-const signature = await crypto.subtle.sign(
-  { name: "ECDSA", hash: "SHA-256" },
-  privateKey,
-  decodedChallenge
-);
-```
-
-Keybound expects the raw 64-byte P-256 signature format returned by Web Crypto.
-
-Handle browser crypto failures as proof failure:
-
-```text
-NotAllowedError     browser refused the key operation
-InvalidAccessError  wrong key type, curve, or usage
-DataError           malformed key or challenge data
-OperationError      browser crypto operation failed
-```
-
-Do not silently enroll a new device after a proof error. Require step-up authentication first.
+The helper creates a nonextractable P-256 key and stores it as a `CryptoKey` in IndexedDB. Browser JavaScript can ask the key to sign, but cannot export the private key bytes through Web Crypto.
 
 ## Configuration
 
@@ -232,11 +212,10 @@ createKeybound({
 });
 ```
 
-Presets:
+Main presets:
 
 | Preset | Challenge lifetime | Device cookie |
 | --- | ---: | --- |
-| `relaxed` | 120 seconds | `SameSite=Lax`, 365 days |
 | `default` | 60 seconds | `SameSite=Lax`, 180 days |
 | `strict` | 30 seconds | `SameSite=Strict`, 90 days |
 
@@ -304,6 +283,8 @@ import {
 
 These helpers work with plain Node, Express, Fastify, Next.js route handlers, Hono, and other Node HTTP frameworks.
 
+Use `keybound/browser` for browser key creation, IndexedDB storage, signing, and browser exception mapping.
+
 ## Performance
 
 The hot path is small:
@@ -316,12 +297,16 @@ storage: your database or cache
 
 The core does no network I/O, database I/O, request parsing, or logging. Use it for session renewal and sensitive actions, not every image, script, or static page request.
 
+Run `npm run bench` from the repo to measure the core proof paths on your machine.
+
 ## Docs
 
 - [How it works](docs/how-it-works.md)
 - [Configuration](docs/configuration.md)
 - [Browser key and exceptions](docs/browser-key.md)
+- [Storage examples](docs/storage.md)
 - [Framework wiring](docs/frameworks.md)
+- [Release checklist](docs/release.md)
 - [Login demo](docs/demo.md)
 
 ## Testing

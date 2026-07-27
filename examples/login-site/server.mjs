@@ -48,6 +48,15 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "GET" && request.url === "/keybound-browser.js") {
+      response.writeHead(200, {
+        "Content-Type": "text/javascript; charset=utf-8",
+        "Cache-Control": "no-store"
+      });
+      response.end(await readFile(join(ROOT, "../../dist/browser.js"), "utf8"));
+      return;
+    }
+
     if (request.method === "GET" && request.url === "/api/status") {
       sendJson(response, 200, getStatus(request));
       return;
