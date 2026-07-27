@@ -1,5 +1,5 @@
+export { createDeviceId, createKeybound, defineConfig } from "./keybound.js";
 export {
-  COOKIE_ONLY_PRESET,
   DEFAULT_PRESET,
   RELAXED_PRESET,
   STRICT_PRESET,
@@ -7,13 +7,24 @@ export {
 } from "./presets.js";
 
 export type {
-  KeyboundAction,
+  Keybound,
+  KeyboundChallenge,
+  KeyboundChallengeInput,
+  KeyboundChallengeRecord,
+  KeyboundChallengeStore,
+  KeyboundConfig,
+  KeyboundConfigOptions,
   KeyboundCookieOptions,
+  KeyboundCookieOverrides,
+  KeyboundOptions,
+  KeyboundP256PublicKey,
   KeyboundPreset,
   KeyboundPresetName,
-  KeyboundRiskPolicy,
-  KeyboundSignalPolicy,
-  KeyboundSignals
+  KeyboundProofInput,
+  KeyboundSameSite,
+  KeyboundStoredProofInput,
+  KeyboundVerificationReason,
+  KeyboundVerificationResult
 } from "./types.js";
 
-export const KEYBOUND_VERSION = "0.0.0";
+export const KEYBOUND_VERSION = "0.1.0";

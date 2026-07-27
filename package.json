@@ -1,7 +1,7 @@
 {
   "name": "keybound",
-  "version": "0.0.0",
-  "description": "Framework-neutral session binding for Node.js. Make stolen session cookies harder to reuse.",
+  "version": "0.1.0",
+  "description": "Device-key session proof for Node.js. Make copied cookies harder to replay.",
   "type": "module",
   "license": "MIT",
   "author": "chrisch88dev",
@@ -16,8 +16,9 @@
   "keywords": [
     "session-security",
     "cookie-security",
-    "cookie-replay",
-    "middleware",
+    "session-replay",
+    "device-binding",
+    "proof-of-possession",
     "nodejs",
     "typescript",
     "security",
@@ -52,6 +53,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test tests/**/*.test.mjs",
+    "demo": "npm run build && node examples/node-proof.mjs",
     "check": "npm run typecheck && npm test",
     "prepack": "npm run check"
   },

@@ -1,45 +1,123 @@
-export type KeyboundPresetName = "relaxed" | "default" | "strict" | "cookie-only";
+export type KeyboundPresetName = "relaxed" | "default" | "strict";
 
-export type KeyboundAction = "allow" | "deny" | "step-up" | "rotate" | "revoke";
+export type KeyboundSameSite = "lax" | "strict" | "none";
 
 export interface KeyboundCookieOptions {
-  readonly httpOnly: boolean;
-  readonly secure: boolean;
-  readonly sameSite: "lax" | "strict" | "none";
-  readonly path: string;
+  readonly name: string;
+  readonly httpOnly: true;
+  readonly secure: true;
+  readonly sameSite: KeyboundSameSite;
+  readonly path: "/";
   readonly maxAgeSeconds: number;
   readonly partitioned: boolean;
 }
 
-export interface KeyboundSignalPolicy {
-  readonly userAgent: boolean;
-  readonly acceptLanguage: boolean;
-  readonly ipPrefix:
-    | false
-    | {
-        readonly ipv4Bits: number;
-        readonly ipv6Bits: number;
-      };
-  readonly custom: readonly string[];
-}
-
-export interface KeyboundRiskPolicy {
-  readonly maxDriftScore: number;
-  readonly allowMissingBinding: boolean;
-  readonly rotateOnSoftDrift: boolean;
-  readonly revokeOnHardDrift: boolean;
+export interface KeyboundCookieOverrides {
+  readonly name?: string;
+  readonly sameSite?: KeyboundSameSite;
+  readonly maxAgeSeconds?: number;
+  readonly partitioned?: boolean;
 }
 
 export interface KeyboundPreset {
   readonly name: KeyboundPresetName;
+  readonly challengeTtlMs: number;
   readonly cookie: KeyboundCookieOptions;
-  readonly signals: KeyboundSignalPolicy;
-  readonly risk: KeyboundRiskPolicy;
 }
 
-export interface KeyboundSignals {
-  readonly userAgent?: string;
-  readonly acceptLanguage?: string;
-  readonly ipAddress?: string;
-  readonly custom?: Readonly<Record<string, string | number | boolean | null>>;
+export interface KeyboundConfigOptions {
+  readonly preset?: KeyboundPresetName;
+  readonly challengeTtlMs?: number;
+  readonly cookie?: KeyboundCookieOverrides;
+}
+
+export interface KeyboundOptions extends KeyboundConfigOptions {
+  readonly secret: string | Uint8Array;
+}
+
+export interface KeyboundConfig {
+  readonly preset: KeyboundPresetName;
+  readonly challengeTtlMs: number;
+  readonly cookie: KeyboundCookieOptions;
+}
+
+export interface KeyboundP256PublicKey {
+  readonly kty: "EC";
+  readonly crv: "P-256";
+  readonly x: string;
+  readonly y: string;
+}
+
+export interface KeyboundChallengeRecord {
+  readonly id: string;
+  readonly digest: string;
+  readonly expiresAt: number;
+}
+
+export interface KeyboundChallenge {
+  readonly id: string;
+  readonly challenge: string;
+  readonly expiresAt: number;
+  readonly record: KeyboundChallengeRecord;
+}
+
+export interface KeyboundChallengeInput {
+  readonly sessionId: string;
+  readonly deviceId: string;
+  readonly publicKey: KeyboundP256PublicKey;
+  readonly now?: number;
+}
+
+export interface KeyboundProofInput {
+  readonly sessionId: string;
+  readonly deviceId: string;
+  readonly challengeId: string;
+  readonly challenge: string;
+  readonly signature: string;
+  readonly publicKey: KeyboundP256PublicKey;
+  readonly record: KeyboundChallengeRecord;
+  readonly now?: number;
+}
+
+/**
+ * The consume operation must be atomic. It returns true only once for the
+ * matching id and digest, then returns false for every later attempt.
+ */
+export interface KeyboundChallengeStore {
+  get(challengeId: string): Promise<KeyboundChallengeRecord | null>;
+  consume(challengeId: string, expectedDigest: string): Promise<boolean>;
+}
+
+export interface KeyboundStoredProofInput
+  extends Omit<KeyboundProofInput, "record"> {
+  readonly store: KeyboundChallengeStore;
+}
+
+export type KeyboundVerificationReason =
+  | "challenge-not-found"
+  | "challenge-expired"
+  | "challenge-mismatch"
+  | "invalid-proof"
+  | "invalid-signature"
+  | "challenge-replayed";
+
+export type KeyboundVerificationResult =
+  | {
+      readonly ok: true;
+      readonly action: "allow";
+    }
+  | {
+      readonly ok: false;
+      readonly action: "deny";
+      readonly reason: KeyboundVerificationReason;
+    };
+
+export interface Keybound {
+  readonly config: KeyboundConfig;
+  createDeviceId(): string;
+  issueChallenge(input: KeyboundChallengeInput): KeyboundChallenge;
+  verifyProof(input: KeyboundProofInput): KeyboundVerificationResult;
+  verifyAndConsumeProof(
+    input: KeyboundStoredProofInput
+  ): Promise<KeyboundVerificationResult>;
 }

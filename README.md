@@ -1,10 +1,10 @@
 # keybound
 
-Session replay resistance for Node.js.
+Device-key session proof for Node.js.
 
-Keybound is a TypeScript package for applications that want additional protection around authenticated sessions. Its purpose is to make copied session cookies harder to reuse from a different environment without making ordinary changes in a user's network or browser session cause avoidable sign-outs.
+Keybound adds a proof step to an authenticated session. A browser-held P-256 key signs a fresh server challenge that is bound to one session, one device, and the enrolled public key. A copied cookie does not contain that private key.
 
-The package is in early development. The current release contains immutable security presets and the type definitions that will support the session protection API.
+Keybound is framework-neutral. It does not replace your authentication library, session store, or database. It provides the small server-side core that those systems can call.
 
 ## Install
 
@@ -12,40 +12,138 @@ The package is in early development. The current release contains immutable secu
 npm install keybound
 ```
 
-## Current API
+Requires Node.js 20 or newer.
+
+## Setup
+
+Use a random server secret. Keep it out of source control and rotate it through your normal secret-management process.
 
 ```ts
-import { DEFAULT_PRESET } from "keybound";
+import { randomBytes } from "node:crypto";
+import { createKeybound } from "keybound";
 
-const sessionSecurity = {
-  ...DEFAULT_PRESET,
-  // Add application-specific settings when the session API is enabled.
+const keybound = createKeybound({
+  secret: process.env.KEYBOUND_SECRET ?? randomBytes(32),
+  preset: "default"
+});
+```
+
+`keybound.config.cookie` is the hardened configuration for the device identifier cookie. The default is an `__Host-` cookie with `Secure`, `HttpOnly`, and `Path=/` set. The device identifier is not a secret. The browser private key is the proof material and must not be stored in a cookie.
+
+## Flow
+
+1. The browser creates an ECDSA P-256 key pair with Web Crypto. Create the private key as nonextractable and persist it outside cookies, for example in IndexedDB.
+2. During device enrollment, send the public JWK to the server. Store it against a server-generated device ID.
+3. Set the device ID as the configured secure cookie. Store the public key server-side.
+4. When proof is required, issue a short-lived challenge and return its ID and value to the browser.
+5. The browser signs the base64url-decoded challenge with ECDSA SHA-256, then sends the signature back.
+6. Load the enrolled public key from the server, verify the proof, and atomically consume the challenge.
+
+The public key passed to Keybound must come from the enrolled device record, not from the proof request body. Keybound also binds that key into the challenge record, so a swapped key cannot verify a previously issued challenge.
+
+Device enrollment and replacement are security boundaries. Require an existing device proof or step-up authentication before adding or replacing a key. A cookie-only enrollment endpoint lets a cookie thief register their own device.
+
+## Server Example
+
+```ts
+const issued = keybound.issueChallenge({
+  sessionId,
+  deviceId,
+  publicKey: enrolledDevice.publicKey
+});
+
+await challengeStore.insert(issued.record);
+
+return {
+  challengeId: issued.id,
+  challenge: issued.challenge,
+  expiresAt: issued.expiresAt
 };
 ```
 
-The exported presets are the starting point for the public configuration model. The session middleware, storage contract, and framework adapters are not part of this release yet.
+```ts
+const result = await keybound.verifyAndConsumeProof({
+  store: challengeStore,
+  sessionId,
+  deviceId,
+  challengeId: request.body.challengeId,
+  challenge: request.body.challenge,
+  signature: request.body.signature,
+  publicKey: enrolledDevice.publicKey
+});
 
-## Design Boundary
+if (!result.ok) {
+  // Deny, require step-up, or end the session according to your application policy.
+}
+```
 
-- Designed to work with existing authentication, session, and database systems.
-- Core security decisions will remain independent of a specific framework or database.
-- Session state and application policy remain under the host application's control.
-- The package will complement secure cookies, session rotation, CSRF protection, XSS defenses, MFA, and incident response.
-- No security package can protect a session from a compromised server or code running inside the active browser session.
+`challengeStore` has two operations:
 
-Keybound is focused on session replay. It is not an HTTP security-header package and is not intended to replace Helmet.
+```ts
+interface KeyboundChallengeStore {
+  get(challengeId: string): Promise<KeyboundChallengeRecord | null>;
+  consume(challengeId: string, expectedDigest: string): Promise<boolean>;
+}
+```
 
-## Project Status
+`consume` must be atomic. It must return `true` once for the matching challenge ID and digest, then return `false` for every later call. A SQL implementation can use a conditional update or delete. A Redis implementation should use one atomic command or script.
 
-The API is being developed in small, reviewable steps. Do not use this package as the only protection for production sessions until the session implementation has been released and reviewed.
+The included runnable flow is available after building:
 
-## Contributing
+```sh
+npm run build
+node examples/node-proof.mjs
+```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the development and review expectations.
+## Configuration
 
-## Security
+| Preset | Challenge lifetime | Device cookie |
+| --- | ---: | --- |
+| `relaxed` | 120 seconds | `SameSite=Lax`, 365 days |
+| `default` | 60 seconds | `SameSite=Lax`, 180 days |
+| `strict` | 30 seconds | `SameSite=Strict`, 90 days |
 
-Read [SECURITY.md](SECURITY.md) before reporting a vulnerability.
+All presets keep `Secure`, `HttpOnly`, and `Path=/` enabled. You can choose a preset and override the safe cookie fields:
+
+```ts
+const keybound = createKeybound({
+  secret: process.env.KEYBOUND_SECRET!,
+  preset: "strict",
+  cookie: {
+    name: "__Host-keybound-device",
+    maxAgeSeconds: 60 * 60 * 24 * 30,
+    partitioned: true
+  }
+});
+```
+
+Challenge lifetime is deliberately bounded from 5 seconds to 5 minutes. Shorter lifetimes reduce the replay window. The device cookie is host-only because Keybound does not expose a `Domain` option.
+
+## Technology And Performance
+
+- Strict TypeScript and ESM.
+- Node.js built-ins only, with no runtime dependencies.
+- `randomBytes` for challenge and device IDs.
+- HMAC-SHA-256 to bind the challenge, session, device, public key, and expiry into the stored record.
+- ECDSA P-256 with SHA-256 for browser proof verification.
+
+Issuing a challenge performs one random generation step and one HMAC. Verifying a proof performs one HMAC and one P-256 signature verification. The core does no network or database I/O. Storage latency and the browser round trip remain the application’s responsibility, so use proof on session continuation, session renewal, and high-risk actions rather than static asset requests.
+
+## Security Boundary
+
+Keybound helps when an attacker has copied cookies but cannot use the enrolled browser key. It does not protect a compromised server, XSS or malware operating inside the active browser, phishing that obtains a fresh proof, or an application that accepts an attacker-controlled public key as enrolled state.
+
+It complements secure session cookies, session rotation, CSRF protection, XSS defenses, MFA, and incident response. It is not an HTTP security-header package and does not replace Helmet.
+
+## Testing
+
+```sh
+npm run check
+```
+
+The test suite covers valid proofs, session and device mismatches, tampered challenges, key substitution, expiry, malformed input, and atomic replay handling.
+
+Security issues belong in [SECURITY.md](SECURITY.md). Contribution and review expectations are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

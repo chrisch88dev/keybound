@@ -2,122 +2,53 @@ import type { KeyboundPreset } from "./types.js";
 
 const freezePreset = <T extends KeyboundPreset>(preset: T): T => {
   Object.freeze(preset.cookie);
-  Object.freeze(preset.signals.ipPrefix || {});
-  Object.freeze(preset.signals.custom);
-  Object.freeze(preset.signals);
-  Object.freeze(preset.risk);
   return Object.freeze(preset);
 };
 
 export const RELAXED_PRESET = freezePreset({
   name: "relaxed",
+  challengeTtlMs: 120_000,
   cookie: {
+    name: "__Host-keybound",
     httpOnly: true,
     secure: true,
     sameSite: "lax",
     path: "/",
-    maxAgeSeconds: 60 * 60 * 24 * 30,
+    maxAgeSeconds: 60 * 60 * 24 * 365,
     partitioned: false
-  },
-  signals: {
-    userAgent: true,
-    acceptLanguage: false,
-    ipPrefix: false,
-    custom: []
-  },
-  risk: {
-    maxDriftScore: 70,
-    allowMissingBinding: true,
-    rotateOnSoftDrift: true,
-    revokeOnHardDrift: false
   }
 } as const);
 
 export const DEFAULT_PRESET = freezePreset({
   name: "default",
+  challengeTtlMs: 60_000,
   cookie: {
+    name: "__Host-keybound",
     httpOnly: true,
     secure: true,
     sameSite: "lax",
     path: "/",
-    maxAgeSeconds: 60 * 60 * 24 * 14,
+    maxAgeSeconds: 60 * 60 * 24 * 180,
     partitioned: false
-  },
-  signals: {
-    userAgent: true,
-    acceptLanguage: true,
-    ipPrefix: {
-      ipv4Bits: 24,
-      ipv6Bits: 56
-    },
-    custom: []
-  },
-  risk: {
-    maxDriftScore: 40,
-    allowMissingBinding: false,
-    rotateOnSoftDrift: true,
-    revokeOnHardDrift: true
   }
 } as const);
 
 export const STRICT_PRESET = freezePreset({
   name: "strict",
+  challengeTtlMs: 30_000,
   cookie: {
+    name: "__Host-keybound",
     httpOnly: true,
     secure: true,
     sameSite: "strict",
     path: "/",
-    maxAgeSeconds: 60 * 60 * 8,
-    partitioned: true
-  },
-  signals: {
-    userAgent: true,
-    acceptLanguage: true,
-    ipPrefix: {
-      ipv4Bits: 28,
-      ipv6Bits: 64
-    },
-    custom: []
-  },
-  risk: {
-    maxDriftScore: 20,
-    allowMissingBinding: false,
-    rotateOnSoftDrift: true,
-    revokeOnHardDrift: true
-  }
-} as const);
-
-export const COOKIE_ONLY_PRESET = freezePreset({
-  name: "cookie-only",
-  cookie: {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAgeSeconds: 60 * 60 * 24 * 7,
+    maxAgeSeconds: 60 * 60 * 24 * 90,
     partitioned: false
-  },
-  signals: {
-    userAgent: false,
-    acceptLanguage: false,
-    ipPrefix: false,
-    custom: []
-  },
-  risk: {
-    maxDriftScore: 100,
-    allowMissingBinding: false,
-    rotateOnSoftDrift: false,
-    revokeOnHardDrift: false
   }
 } as const);
 
-export const presets = freezePresetMap({
+export const presets = Object.freeze({
   relaxed: RELAXED_PRESET,
   default: DEFAULT_PRESET,
-  strict: STRICT_PRESET,
-  "cookie-only": COOKIE_ONLY_PRESET
+  strict: STRICT_PRESET
 });
-
-function freezePresetMap<T extends Record<string, KeyboundPreset>>(value: T): Readonly<T> {
-  return Object.freeze(value);
-}

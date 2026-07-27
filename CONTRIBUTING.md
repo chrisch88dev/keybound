@@ -1,28 +1,30 @@
 # Contributing
 
-Keybound is security-sensitive software. Keep changes focused, reviewable, and supported by tests.
+Keybound is small by design. Keep changes focused, typed, and covered by tests.
 
-## Development
+## Local Checks
 
-Use Node.js 20 or newer, then run:
+Use Node.js 20 or newer:
 
 ```sh
 npm ci
 npm run check
+npm run build
+node examples/node-proof.mjs
 ```
 
-The package is written in strict TypeScript and currently has no runtime dependencies. Keep the core independent of frameworks, databases, and application-specific session stores.
+The package uses strict TypeScript, Node.js crypto primitives, and no runtime dependencies. Keep the core independent of a specific framework, database, or session library.
 
-## Changes
+## Pull Requests
 
-- Include tests for behavior changes.
-- Explain changes to security behavior, defaults, and public types.
-- Keep request-path work bounded and avoid unnecessary allocations or blocking I/O.
-- Do not include secrets, cookies, tokens, private logs, or production request data.
-- Keep documentation precise and avoid claims that cannot be tested.
+- Describe the behavior change and its effect on the public API.
+- Include tests for successful and failing paths.
+- Keep documentation aligned with the actual API.
+- Do not include secrets, cookies, tokens, session IDs, production logs, or user data.
+- Use a public issue for ordinary defects and [SECURITY.md](SECURITY.md) for vulnerabilities.
 
-## Security-Sensitive Changes
+## Security Changes
 
-Changes involving cookie handling, session binding, cryptography, comparisons, parsing, or revocation need focused tests and careful review. Explain relevant failure behavior and compatibility impact in the pull request.
+Changes to challenge encoding, HMAC input, public key parsing, signature verification, expiry, cookie defaults, or the store contract need focused tests. Include the expected behavior under malformed input, concurrent consumption, and upgrade compatibility.
 
-Public API changes should be typed, explicit, and difficult to misuse. Avoid implicit global state and framework-specific behavior in the core package.
+Do not add implicit global state, blocking I/O, or framework-specific policy to the core. Public APIs should be explicit and difficult to misuse.
