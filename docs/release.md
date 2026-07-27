@@ -21,6 +21,7 @@ dist
 docs
 examples
 bench
+src
 README.md
 SECURITY.md
 LICENSE
@@ -73,8 +74,8 @@ The workflow runs install, checks, benchmarks, a pack dry-run, then publishes.
 After npm publish succeeds:
 
 ```sh
-git tag -s v0.1.0 -m "keybound v0.1.0"
-git push origin v0.1.0
+git tag -s vX.Y.Z -m "keybound vX.Y.Z"
+git push origin vX.Y.Z
 ```
 
 Use the `2D45` signing key:
@@ -85,7 +86,7 @@ Use the `2D45` signing key:
 
 ## GitHub Release
 
-Create a GitHub release from `v0.1.0`.
+Create a GitHub release from the signed version tag.
 
 Keep release notes short:
 
