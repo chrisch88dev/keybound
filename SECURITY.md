@@ -6,7 +6,7 @@ Keybound verifies a one-time device proof for a session. It is designed for the 
 
 - Use a server secret with at least 32 random bytes. Keep it in your secret manager, not source control.
 - Generate device private keys as nonextractable Web Crypto keys and keep them outside cookies.
-- Store the enrolled public key server-side with the device ID. Do not accept a proof request’s public key as the enrolled key.
+- Store the enrolled public key server-side with the device ID. Do not accept a proof request's public key as the enrolled key.
 - Require an existing device proof or step-up authentication to enroll or replace a device key. Never allow a cookie-only session to register a new key.
 - Pass that stored public key to both `issueChallenge` and `verifyAndConsumeProof`.
 - Pass a server-defined `purpose` for sensitive actions. Do not let the request body choose it.

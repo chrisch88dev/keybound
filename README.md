@@ -1,6 +1,8 @@
 # keybound
 
-Device-key session proof for Node.js.
+Device-key session proof for Node.js. Keybound makes copied session cookies harder to replay by requiring a browser-held private key for sensitive server actions.
+
+Keybound started from a practical problem: cookie dumps make normal session cookies portable. The goal is a small Node.js security primitive that a solo developer can understand, test, and wire into real apps without buying into a framework or platform.
 
 Keybound adds a proof step to an authenticated session. A browser-held P-256 key signs a fresh server challenge that is bound to one session, one device, one server purpose, and the enrolled public key. A copied cookie does not contain that private key.
 
@@ -29,6 +31,14 @@ const keybound = createKeybound({
 ```
 
 `keybound.config.cookie` is the hardened configuration for the device identifier cookie. The default is an `__Host-` cookie with `Secure`, `HttpOnly`, and `Path=/` set. The device identifier is not a secret. The browser private key is the proof material and must not be stored in a cookie.
+
+The Keybound device cookie is separate from your login cookie:
+
+```text
+session cookie -> who is logged in
+Keybound device cookie -> which enrolled device record to load
+browser private key -> proof that copied cookies are not enough
+```
 
 ## Flow
 
@@ -99,6 +109,14 @@ npm run build
 node examples/node-proof.mjs
 ```
 
+The browser login demo shows the full session and device flow:
+
+```sh
+npm run demo:login
+```
+
+Open `http://localhost:4173`.
+
 ## Configuration
 
 | Preset | Challenge lifetime | Device cookie |
@@ -124,6 +142,16 @@ const keybound = createKeybound({
 Challenge lifetime is deliberately bounded from 5 seconds to 5 minutes. Shorter lifetimes reduce the replay window. The device cookie is host-only because Keybound does not expose a `Domain` option.
 
 `purpose` is optional and defaults to `session`. For sensitive routes, pass an explicit stable value from server code. Do not trust the request body to choose the purpose.
+
+For cookie helpers:
+
+```ts
+import {
+  readKeyboundCookie,
+  serializeKeyboundCookie,
+  clearKeyboundCookie
+} from "keybound/http";
+```
 
 ## Browser Key
 
@@ -177,6 +205,14 @@ Issuing a challenge performs one random generation step and one HMAC. Verifying 
 Keybound helps when an attacker has copied cookies but cannot use the enrolled browser key. It also limits where a fresh proof can be used when you bind challenges to server purposes. It does not protect a compromised server, XSS or malware operating inside the active browser, phishing that obtains a fresh proof for the same purpose, or an application that accepts an attacker-controlled public key as enrolled state.
 
 It complements secure session cookies, session rotation, CSRF protection, XSS defenses, MFA, and incident response. It is not an HTTP security-header package and does not replace Helmet.
+
+## Docs
+
+- [How it works](docs/how-it-works.md)
+- [Configuration](docs/configuration.md)
+- [Browser key and exceptions](docs/browser-key.md)
+- [Framework wiring](docs/frameworks.md)
+- [Login demo](docs/demo.md)
 
 ## Testing
 
