@@ -29,6 +29,7 @@
   "sideEffects": false,
   "files": [
     "dist",
+    "examples",
     "README.md",
     "LICENSE",
     "SECURITY.md"
@@ -58,6 +59,7 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test tests/**/*.test.mjs",
     "demo": "npm run build && node examples/node-proof.mjs",
+    "demo:login": "npm run build && node examples/login-site/server.mjs",
     "check": "npm run typecheck && npm test",
     "prepack": "npm run check"
   },

@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Keybound Login Demo</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --text: #101319;
+        --muted: #5e6673;
+        --line: #d9dee7;
+        --accent: #0f766e;
+        --accent-dark: #115e59;
+        --danger: #b42318;
+        --ok: #166534;
+        --code: #111827;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: end;
+        margin-bottom: 24px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 34px;
+        line-height: 1.1;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 18px;
+        line-height: 1.2;
+      }
+
+      h3 {
+        font-size: 14px;
+        line-height: 1.2;
+      }
+
+      p {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #ffffff;
+        cursor: pointer;
+        padding: 10px 14px;
+        font-weight: 650;
+      }
+
+      button:hover {
+        background: var(--accent-dark);
+      }
+
+      button.secondary {
+        background: #e8edf3;
+        color: var(--text);
+      }
+
+      button.secondary:hover {
+        background: #dce3eb;
+      }
+
+      input,
+      select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #ffffff;
+        color: var(--text);
+        padding: 10px 12px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 18px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 18px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .step {
+        min-height: 112px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: #fbfcfd;
+      }
+
+      .step strong {
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      .state {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .pill {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: #fbfcfd;
+      }
+
+      .pill b {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .ok {
+        color: var(--ok);
+      }
+
+      .bad {
+        color: var(--danger);
+      }
+
+      pre {
+        min-height: 280px;
+        overflow: auto;
+        margin: 0;
+        border-radius: 8px;
+        background: var(--code);
+        color: #e5edf7;
+        padding: 14px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+
+      code {
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 13px;
+      }
+
+      @media (max-width: 860px) {
+        header,
+        .grid,
+        .flow,
+        .state {
+          grid-template-columns: 1fr;
+        }
+
+        main {
+          width: min(100% - 20px, 1180px);
+          padding: 20px 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="stack">
+          <h1>Keybound login demo</h1>
+          <p>
+            A normal session cookie identifies the login. A separate Keybound
+            device cookie selects the enrolled public key. A browser private key
+            signs a fresh challenge before the protected action runs.
+          </p>
+        </div>
+        <button class="secondary" id="refresh">Refresh state</button>
+      </header>
+
+      <section class="grid">
+        <div class="stack">
+          <div class="panel stack">
+            <h2>Flow</h2>
+            <div class="flow">
+              <div class="step">
+                <strong>1. Login</strong>
+                <p>Browser creates a nonextractable P-256 key and sends only the public key.</p>
+              </div>
+              <div class="step">
+                <strong>2. Link</strong>
+                <p>Server stores session, device ID, and public key as one record.</p>
+              </div>
+              <div class="step">
+                <strong>3. Challenge</strong>
+                <p>Server issues a short challenge for a server purpose.</p>
+              </div>
+              <div class="step">
+                <strong>4. Proof</strong>
+                <p>Browser signs. Server verifies and consumes the challenge once.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel stack">
+            <h2>Controls</h2>
+            <label>
+              Demo username
+              <input id="username" value="chris" autocomplete="off">
+            </label>
+            <label>
+              Protected purpose
+              <select id="purpose">
+                <option value="settings:view-secret">settings:view-secret</option>
+                <option value="session:renew">session:renew</option>
+              </select>
+            </label>
+            <div class="actions">
+              <button id="login">Login and enroll browser</button>
+              <button id="protected">Run protected action</button>
+              <button class="secondary" id="dump">Simulate copied cookies</button>
+              <button class="secondary" id="logout">Logout</button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="stack">
+          <div class="panel stack">
+            <h2>Server state</h2>
+            <div class="state">
+              <div class="pill">
+                <b>Logged in</b>
+                <span id="loggedIn">unknown</span>
+              </div>
+              <div class="pill">
+                <b>Device linked</b>
+                <span id="linked">unknown</span>
+              </div>
+              <div class="pill">
+                <b>Session cookie</b>
+                <span id="sessionCookie">unknown</span>
+              </div>
+              <div class="pill">
+                <b>Device cookie</b>
+                <span id="deviceCookie">unknown</span>
+              </div>
+            </div>
+          </div>
+          <div class="panel stack">
+            <h2>Event log</h2>
+            <pre><code id="log">Ready.</code></pre>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script>
+      const DB_NAME = "keybound-demo";
+      const STORE = "keys";
+      const KEY_ID = "device";
+
+      const $ = (id) => document.getElementById(id);
+
+      $("refresh").addEventListener("click", refresh);
+      $("login").addEventListener("click", login);
+      $("protected").addEventListener("click", runProtectedAction);
+      $("dump").addEventListener("click", simulateCookieDump);
+      $("logout").addEventListener("click", logout);
+
+      refresh();
+
+      async function login() {
+        const username = $("username").value.trim();
+        const keyPair = await loadOrCreateKeyPair();
+        const publicKey = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+        const result = await postJson("/api/login", { username, publicKey });
+        log("login", result);
+        await refresh();
+      }
+
+      async function runProtectedAction() {
+        const purpose = $("purpose").value;
+
+        try {
+          const keyPair = await loadOrCreateKeyPair();
+          const issued = await postJson("/api/challenge", { purpose });
+
+          if (!issued.ok) {
+            log("challenge denied", issued);
+            await refresh();
+            return;
+          }
+
+          const signature = await signChallenge(keyPair.privateKey, issued.challenge);
+          const proof = await postJson("/api/proof", {
+            purpose,
+            challengeId: issued.challengeId,
+            challenge: issued.challenge,
+            signature
+          });
+
+          log("protected action", { issued, proof });
+          await refresh();
+        } catch (error) {
+          log("browser proof exception", describeCryptoError(error));
+        }
+      }
+
+      async function simulateCookieDump() {
+        const result = await postJson("/api/fraud/cookie-dump", {});
+        log("copied cookie simulation", result);
+      }
+
+      async function logout() {
+        await postJson("/api/logout", {});
+        log("logout", { ok: true });
+        await refresh();
+      }
+
+      async function refresh() {
+        const status = await getJson("/api/status");
+        $("loggedIn").textContent = status.loggedIn ? `yes, ${status.username}` : "no";
+        $("loggedIn").className = status.loggedIn ? "ok" : "bad";
+        $("linked").textContent = status.sessionLinkedToDevice ? "yes" : "no";
+        $("linked").className = status.sessionLinkedToDevice ? "ok" : "bad";
+        $("sessionCookie").textContent = status.hasSessionCookie
+          ? status.sessionId
+          : "missing";
+        $("deviceCookie").textContent = status.hasDeviceCookie
+          ? status.deviceId
+          : "missing";
+      }
+
+      async function loadOrCreateKeyPair() {
+        const db = await openDb();
+        const saved = await dbGet(db, KEY_ID);
+        if (saved) {
+          return saved;
+        }
+
+        const keyPair = await crypto.subtle.generateKey(
+          { name: "ECDSA", namedCurve: "P-256" },
+          false,
+          ["sign", "verify"]
+        );
+        await dbPut(db, KEY_ID, keyPair);
+        return keyPair;
+      }
+
+      async function signChallenge(privateKey, challenge) {
+        const signature = await crypto.subtle.sign(
+          { name: "ECDSA", hash: "SHA-256" },
+          privateKey,
+          fromBase64url(challenge)
+        );
+
+        return toBase64url(signature);
+      }
+
+      function describeCryptoError(error) {
+        return {
+          ok: false,
+          name: error?.name ?? "Error",
+          message:
+            error?.name === "NotAllowedError"
+              ? "The browser refused this key operation."
+              : error?.name === "InvalidAccessError"
+                ? "The stored key cannot be used for this proof."
+                : error?.name === "DataError"
+                  ? "The key or challenge data is malformed."
+                  : error?.name === "OperationError"
+                    ? "The browser crypto operation failed."
+                    : error?.message ?? "Browser proof failed."
+        };
+      }
+
+      async function getJson(url) {
+        const response = await fetch(url, { credentials: "same-origin" });
+        return response.json();
+      }
+
+      async function postJson(url, body) {
+        const response = await fetch(url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        return response.json();
+      }
+
+      function openDb() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME, 1);
+          request.onupgradeneeded = () => {
+            request.result.createObjectStore(STORE);
+          };
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      function dbGet(db, key) {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE, "readonly");
+          const request = tx.objectStore(STORE).get(key);
+          request.onsuccess = () => resolve(request.result ?? null);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      function dbPut(db, key, value) {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE, "readwrite");
+          tx.objectStore(STORE).put(value, key);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      }
+
+      function fromBase64url(value) {
+        const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
+        const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+        const binary = atob(padded);
+        const bytes = new Uint8Array(binary.length);
+
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+
+        return bytes;
+      }
+
+      function toBase64url(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+
+        for (const byte of bytes) {
+          binary += String.fromCharCode(byte);
+        }
+
+        return btoa(binary)
+          .replaceAll("+", "-")
+          .replaceAll("/", "_")
+          .replaceAll("=", "");
+      }
+
+      function log(label, value) {
+        $("log").textContent = `${label}\n${JSON.stringify(value, null, 2)}`;
+      }
+    </script>
+  </body>
+</html>
