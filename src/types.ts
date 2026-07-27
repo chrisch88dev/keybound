@@ -65,12 +65,14 @@ export interface KeyboundChallengeInput {
   readonly sessionId: string;
   readonly deviceId: string;
   readonly publicKey: KeyboundP256PublicKey;
+  readonly purpose?: string;
   readonly now?: number;
 }
 
 export interface KeyboundProofInput {
   readonly sessionId: string;
   readonly deviceId: string;
+  readonly purpose?: string;
   readonly challengeId: string;
   readonly challenge: string;
   readonly signature: string;

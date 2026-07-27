@@ -34,8 +34,11 @@ const MIN_CHALLENGE_TTL_MS = 5_000;
 const MAX_CHALLENGE_TTL_MS = 5 * 60_000;
 const MAX_COOKIE_AGE_SECONDS = 60 * 60 * 24 * 365;
 const MAX_SESSION_ID_BYTES = 512;
+const MAX_PURPOSE_BYTES = 128;
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const COOKIE_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,128}$/;
+const PURPOSE = /^[A-Za-z0-9._:/@+ -]+$/;
+const DEFAULT_PURPOSE = "session";
 const PROTOCOL_LABEL = Buffer.from("keybound/device-proof/v1", "utf8");
 
 const ALLOW = Object.freeze({ ok: true, action: "allow" } as const);
@@ -110,6 +113,7 @@ export function createKeybound(options: KeyboundOptions): Keybound {
     issueChallenge(input: KeyboundChallengeInput): KeyboundChallenge {
       const now = readTimestamp(input.now);
       const sessionId = readSessionId(input.sessionId);
+      const purpose = readPurpose(input.purpose);
       const deviceId = readRandomValue(input.deviceId, DEVICE_ID_BYTES, "deviceId");
       const publicKey = readPublicKey(input.publicKey);
       const idBytes = randomBytes(CHALLENGE_BYTES);
@@ -120,6 +124,7 @@ export function createKeybound(options: KeyboundOptions): Keybound {
       const digest = createChallengeDigest(
         secret,
         sessionId,
+        purpose,
         deviceId,
         idBytes,
         challengeBytes,
@@ -174,6 +179,7 @@ function verifyProof(
   try {
     const now = readTimestamp(input.now);
     const sessionId = readSessionId(input.sessionId);
+    const purpose = readPurpose(input.purpose);
     const deviceId = readRandomValue(input.deviceId, DEVICE_ID_BYTES, "deviceId");
     const challengeId = readRandomValue(
       input.challengeId,
@@ -204,6 +210,7 @@ function verifyProof(
     const expectedDigest = createChallengeDigest(
       secret,
       sessionId,
+      purpose,
       deviceId,
       challengeId,
       challenge,
@@ -233,6 +240,7 @@ function verifyProof(
 function createChallengeDigest(
   secret: Buffer,
   sessionId: string,
+  purpose: string,
   deviceId: Buffer,
   challengeId: Buffer,
   challenge: Buffer,
@@ -243,6 +251,7 @@ function createChallengeDigest(
   const hmac = createHmac("sha256", secret);
   hmac.update(PROTOCOL_LABEL);
   updateField(hmac, Buffer.from(sessionId, "utf8"));
+  updateField(hmac, Buffer.from(purpose, "utf8"));
   updateField(hmac, deviceId);
   updateField(hmac, challengeId);
   updateField(hmac, challenge);
@@ -366,6 +375,22 @@ function readSessionId(value: string): string {
   }
 
   return value;
+}
+
+function readPurpose(value: string | undefined): string {
+  const purpose = value ?? DEFAULT_PURPOSE;
+  if (
+    typeof purpose !== "string" ||
+    purpose.length === 0 ||
+    Buffer.byteLength(purpose, "utf8") > MAX_PURPOSE_BYTES ||
+    !PURPOSE.test(purpose)
+  ) {
+    throw new TypeError(
+      "Keybound purpose must be a non-empty visible ASCII string up to 128 bytes."
+    );
+  }
+
+  return purpose;
 }
 
 function readRandomValue(value: string, size: number, name: string): Buffer {

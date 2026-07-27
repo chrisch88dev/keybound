@@ -5,10 +5,11 @@ import { createKeybound } from "../dist/index.js";
 const keybound = createKeybound({ secret: randomBytes(32) });
 const deviceId = keybound.createDeviceId();
 const sessionId = "session_example";
+const purpose = "session:renew";
 
 const deviceKey = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
 const publicKey = deviceKey.publicKey.export({ format: "jwk" });
-const issued = keybound.issueChallenge({ sessionId, deviceId, publicKey });
+const issued = keybound.issueChallenge({ sessionId, deviceId, publicKey, purpose });
 
 const signature = sign(
   "sha256",
@@ -23,6 +24,7 @@ const result = keybound.verifyProof({
   challenge: issued.challenge,
   signature,
   publicKey,
+  purpose,
   record: issued.record
 });
 

@@ -56,7 +56,7 @@ function createDeviceKey() {
   };
 }
 
-function createFixture() {
+function createFixture(options = {}) {
   const keybound = createKeybound({ secret: randomBytes(32) });
   const device = createDeviceKey();
   const deviceId = keybound.createDeviceId();
@@ -65,11 +65,20 @@ function createFixture() {
     sessionId,
     deviceId,
     publicKey: device.publicKey,
+    purpose: options.purpose,
     now: NOW
   });
   const signature = device.signChallenge(issued.challenge);
 
-  return { keybound, device, deviceId, sessionId, issued, signature };
+  return {
+    keybound,
+    device,
+    deviceId,
+    sessionId,
+    purpose: options.purpose,
+    issued,
+    signature
+  };
 }
 
 function proofInput(fixture, overrides = {}) {
@@ -81,6 +90,7 @@ function proofInput(fixture, overrides = {}) {
     signature: fixture.signature,
     publicKey: fixture.device.publicKey,
     record: fixture.issued.record,
+    purpose: fixture.purpose,
     now: NOW,
     ...overrides
   };
@@ -216,6 +226,21 @@ describe("device proof", () => {
     );
   });
 
+  it("rejects a proof moved to another server purpose", () => {
+    const fixture = createFixture({ purpose: "session:renew" });
+
+    assert.deepEqual(fixture.keybound.verifyProof(proofInput(fixture)), {
+      ok: true,
+      action: "allow"
+    });
+    assert.equal(
+      fixture.keybound.verifyProof(
+        proofInput(fixture, { purpose: "payment:create" })
+      ).reason,
+      "challenge-mismatch"
+    );
+  });
+
   it("rejects an altered challenge before signature verification", () => {
     const fixture = createFixture();
 
@@ -267,6 +292,11 @@ describe("device proof", () => {
     );
     assert.equal(
       fixture.keybound.verifyProof(proofInput(fixture, { signature: "not-a-signature" }))
+        .reason,
+      "invalid-proof"
+    );
+    assert.equal(
+      fixture.keybound.verifyProof(proofInput(fixture, { purpose: "bad\npurpose" }))
         .reason,
       "invalid-proof"
     );
